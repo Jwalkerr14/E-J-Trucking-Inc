@@ -68,6 +68,7 @@ function App() {
   const [profiles, setProfiles] = useState([]);
   const [message, setMessage] = useState("");
   const [editingLoadId, setEditingLoadId] = useState(null);
+  const [editingCustomerId, setEditingCustomerId] = useState(null);
   const [ticketFile, setTicketFile] = useState(null);
   const [ticketPreviewUrl, setTicketPreviewUrl] = useState("");
   const [ocrText, setOcrText] = useState("");
@@ -562,21 +563,57 @@ function App() {
   async function saveCustomer(e) {
     e.preventDefault();
 
-    const { error } = await supabase.from("customers").insert([{
+    const customerToSave = {
       name: customerForm.name.trim(),
       billing_address: customerForm.billing_address.trim(),
       default_rate: Number(customerForm.default_rate || 0),
       default_fsc_percent: Number(customerForm.default_fsc_percent || 0)
-    }]);
+    };
+
+    let error;
+
+    if (editingCustomerId) {
+      const result = await supabase
+        .from("customers")
+        .update(customerToSave)
+        .eq("id", editingCustomerId);
+
+      error = result.error;
+    } else {
+      const result = await supabase
+        .from("customers")
+        .insert([customerToSave]);
+
+      error = result.error;
+    }
 
     if (error) {
       setMessage(error.message.includes("duplicate") ? "That customer already exists." : error.message);
       return;
     }
 
-    setMessage("Customer saved.");
+    setMessage(editingCustomerId ? "Customer updated." : "Customer saved.");
+    setEditingCustomerId(null);
     setCustomerForm({ name: "", billing_address: "", default_rate: "", default_fsc_percent: "0" });
     fetchAll();
+  }
+
+  function startEditCustomer(customer) {
+    setEditingCustomerId(customer.id);
+    setCustomerForm({
+      name: customer.name || "",
+      billing_address: customer.billing_address || "",
+      default_rate: customer.default_rate || "",
+      default_fsc_percent: customer.default_fsc_percent || "0"
+    });
+    setMessage(`Editing customer ${customer.name}. Make changes and click Update Customer.`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEditCustomer() {
+    setEditingCustomerId(null);
+    setCustomerForm({ name: "", billing_address: "", default_rate: "", default_fsc_percent: "0" });
+    setMessage("Customer edit cancelled.");
   }
 
   async function saveDriver(e) {
@@ -1012,18 +1049,23 @@ function App() {
       <>
         <PageHeader title="Customers" subtitle="Add the companies you haul for. Default rate and FSC will auto-fill on load entry." />
         <form onSubmit={saveCustomer} className="card form">
-          <h2>Add Customer</h2>
+          <h2>{editingCustomerId ? "Edit Customer" : "Add Customer"}</h2>
           <input placeholder="Customer Name" value={customerForm.name} onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })} required />
           <input placeholder="Billing Address" value={customerForm.billing_address} onChange={e => setCustomerForm({ ...customerForm, billing_address: e.target.value })} />
           <input type="number" step="0.01" placeholder="Default Customer Rate Per Ton" value={customerForm.default_rate} onChange={e => setCustomerForm({ ...customerForm, default_rate: e.target.value })} />
           <input type="number" step="0.01" placeholder="Default FSC %" value={customerForm.default_fsc_percent} onChange={e => setCustomerForm({ ...customerForm, default_fsc_percent: e.target.value })} />
-          <button type="submit">Save Customer</button>
+          <button type="submit">{editingCustomerId ? "Update Customer" : "Save Customer"}</button>
+          {editingCustomerId && (
+            <button type="button" className="secondary" onClick={cancelEditCustomer}>
+              Cancel Edit
+            </button>
+          )
         </form>
 
         <div className="card">
           <h2>Customer List</h2>
           <table>
-            <thead><tr><th>Name</th><th>Billing Address</th><th>Default Rate/Ton</th><th>Default FSC %</th></tr></thead>
+            <thead><tr><th>Name</th><th>Billing Address</th><th>Default Rate/Ton</th><th>Default FSC %</th><th>Actions</th></tr></thead>
             <tbody>
               {customers.map(customer => (
                 <tr key={customer.id}>
@@ -1031,6 +1073,11 @@ function App() {
                   <td>{customer.billing_address}</td>
                   <td>{money(customer.default_rate)}</td>
                   <td>{Number(customer.default_fsc_percent || 0).toFixed(2)}%</td>
+                  <td>
+                    <button type="button" className="small-button" onClick={() => startEditCustomer(customer)}>
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
