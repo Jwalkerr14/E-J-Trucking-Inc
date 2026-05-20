@@ -64,6 +64,7 @@ function App() {
   const [drivers, setDrivers] = useState([]);
   const [trucks, setTrucks] = useState([]);
   const [invoices, setInvoices] = useState([]);
+  const [profiles, setProfiles] = useState([]);
   const [message, setMessage] = useState("");
   const [editingLoadId, setEditingLoadId] = useState(null);
   const [ticketFile, setTicketFile] = useState(null);
@@ -112,12 +113,13 @@ function App() {
   });
 
   async function fetchAll() {
-    const [loadsResult, customersResult, driversResult, trucksResult, invoicesResult] = await Promise.all([
+    const [loadsResult, customersResult, driversResult, trucksResult, invoicesResult, profilesResult] = await Promise.all([
       supabase.from("loads").select("*").order("load_date", { ascending: false }),
       supabase.from("customers").select("*").eq("active", true).order("name", { ascending: true }),
       supabase.from("drivers").select("*").eq("active", true).order("name", { ascending: true }),
       supabase.from("trucks").select("*").eq("active", true).order("truck_number", { ascending: true }),
-      supabase.from("invoices").select("*").order("created_at", { ascending: false })
+      supabase.from("invoices").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("*").order("full_name", { ascending: true })
     ]);
 
     if (loadsResult.error) setMessage(loadsResult.error.message);
@@ -134,6 +136,9 @@ function App() {
 
     if (invoicesResult.error) setMessage(invoicesResult.error.message);
     else setInvoices(invoicesResult.data || []);
+
+    if (profilesResult.error) setMessage(profilesResult.error.message);
+    else setProfiles(profilesResult.data || []);
   }
 
   useEffect(() => {
@@ -1024,6 +1029,98 @@ function App() {
     );
   }
 
+  async function updateUserRole(profileId, role) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ role })
+      .eq("id", profileId);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage("User role updated.");
+    fetchAll();
+  }
+
+  async function toggleUserActive(profile) {
+    const { error } = await supabase
+      .from("profiles")
+      .update({ active: !profile.active })
+      .eq("id", profile.id);
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setMessage(`User ${profile.active ? "deactivated" : "activated"}.`);
+    fetchAll();
+  }
+
+  function UserManagementPage() {
+    return (
+      <>
+        <PageHeader title="User Management" subtitle="Manage user roles and account access." />
+
+        <div className="card">
+          <h2>System Users</h2>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {profiles.map(profile => (
+                <tr key={profile.id}>
+                  <td>{profile.full_name}</td>
+                  <td>{profile.email}</td>
+
+                  <td>
+                    <select
+                      value={profile.role || "dispatcher"}
+                      onChange={e => updateUserRole(profile.id, e.target.value)}
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="dispatcher">Dispatcher</option>
+                      <option value="driver">Driver</option>
+                    </select>
+                  </td>
+
+                  <td>
+                    <StatusBadge
+                      yes={profile.active}
+                      labelYes="Active"
+                      labelNo="Inactive"
+                    />
+                  </td>
+
+                  <td>
+                    <button
+                      type="button"
+                      className={profile.active ? "small-button danger" : "small-button secondary"}
+                      onClick={() => toggleUserActive(profile)}
+                    >
+                      {profile.active ? "Deactivate" : "Activate"}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  }
+
   function InvoiceHistoryPage() {
     return (
       <>
@@ -1226,6 +1323,7 @@ function App() {
             <NavButton id="trucks" label="Trucks" />
             <NavButton id="invoices" label="Invoices" />
             <NavButton id="invoicehistory" label="Invoice History" />
+            {(currentProfile?.role || "dispatcher") === "admin" && <NavButton id="users" label="Users" />}
             <NavButton id="driverpay" label="Driver Pay" />
           </div>
         </div>
@@ -1240,6 +1338,7 @@ function App() {
         {page === "trucks" && TrucksPage()}
         {page === "invoices" && InvoicesPage()}
         {page === "invoicehistory" && InvoiceHistoryPage()}
+        {page === "users" && UserManagementPage()}
         {page === "driverpay" && DriverPayPage()}
       </div>
 
