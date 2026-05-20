@@ -166,6 +166,21 @@ function App() {
     }
   }, [session]);
 
+  useEffect(() => {
+    if (!currentProfile || currentProfile.role !== "driver") return;
+
+    const driverName = currentProfile.full_name || currentProfile.email || "";
+    const assignedTruck = trucks.find(truck => truck.driver_name === driverName);
+    const matchingDriver = drivers.find(driver => driver.name === driverName);
+
+    setLoadForm(current => ({
+      ...current,
+      driver: driverName,
+      truck_number: assignedTruck?.truck_number || current.truck_number,
+      driver_rate: matchingDriver?.default_pay_percent || current.driver_rate
+    }));
+  }, [currentProfile, trucks, drivers]);
+
   async function fetchProfile() {
     if (!session?.user) return;
 
@@ -922,12 +937,20 @@ function App() {
           <input placeholder="Source SP" value={loadForm.source_sp} onChange={e => updateLoadField("source_sp", e.target.value)} />
           <input placeholder="Ship To" value={loadForm.ship_to} onChange={e => updateLoadField("ship_to", e.target.value)} />
 
-          <select value={loadForm.truck_number} onChange={e => updateLoadField("truck_number", e.target.value)}>
+          <select
+            value={loadForm.truck_number}
+            onChange={e => updateLoadField("truck_number", e.target.value)}
+            disabled={(currentProfile?.role || "dispatcher") === "driver"}
+          >
             <option value="">Select Truck</option>
             {trucks.map(truck => <option key={truck.id} value={truck.truck_number}>{truck.truck_number}</option>)}
           </select>
 
-          <select value={loadForm.driver} onChange={e => updateLoadField("driver", e.target.value)}>
+          <select
+            value={loadForm.driver}
+            onChange={e => updateLoadField("driver", e.target.value)}
+            disabled={(currentProfile?.role || "dispatcher") === "driver"}
+          >
             <option value="">Select Driver</option>
             {drivers.map(driver => <option key={driver.id} value={driver.name}>{driver.name}</option>)}
           </select>
@@ -935,7 +958,14 @@ function App() {
           <input type="number" step="0.01" placeholder="Tons" value={loadForm.tons} onChange={e => updateLoadField("tons", e.target.value)} />
           <input type="number" step="0.01" placeholder="Customer Rate Per Ton" value={loadForm.rate} onChange={e => updateLoadField("rate", e.target.value)} />
           <input type="number" step="0.01" placeholder="FSC %" value={loadForm.fsc} onChange={e => updateLoadField("fsc", e.target.value)} />
-          <input type="number" step="0.01" placeholder="Driver Pay %" value={loadForm.driver_rate} onChange={e => updateLoadField("driver_rate", e.target.value)} />
+          <input
+            type="number"
+            step="0.01"
+            placeholder="Driver Pay %"
+            value={loadForm.driver_rate}
+            onChange={e => updateLoadField("driver_rate", e.target.value)}
+            disabled={(currentProfile?.role || "dispatcher") === "driver"}
+          />
 
           <label className="file-input">
             Ticket / BOL Photo
