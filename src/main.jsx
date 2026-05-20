@@ -1047,10 +1047,13 @@ function App() {
     );
   }
 
- function CustomersPage() {
+function CustomersPage() {
   return (
     <>
-      <PageHeader title="Customers" subtitle="Add or edit companies you haul for. Default rate and FSC will auto-fill on load entry." />
+      <PageHeader
+        title="Customers"
+        subtitle="Add or edit companies you haul for. Default rate and FSC will auto-fill on load entry."
+      />
 
       <form onSubmit={saveCustomer} className="card form">
         <h2>{editingCustomerId ? "Edit Customer" : "Add Customer"}</h2>
