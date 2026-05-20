@@ -318,28 +318,31 @@ function App() {
   }
 
   function guessTicketFields(text) {
-    const cleanText = text.replace(/[ 
+  const cleanText = text.replace(/\s+/g, " ").trim();
 
-	]+/g, " ").trim();
+  const bolMatch =
+    cleanText.match(/(?:BOL|LOAD|TICKET|TKT|SLIP)[ #:.\-]*([A-Z0-9\-]{4,})/i) ||
+    cleanText.match(/([A-Z]{1,4}\-?[0-9]{4,})/i);
 
-    const bolMatch =
-      cleanText.match(/(?:BOL|LOAD|TICKET|TKT|SLIP)[ #:.\-]*([A-Z0-9\-]{4,})/i) ||
-      cleanText.match(/([A-Z]{1,4}\-?[0-9]{4,})/i);
+  const tonsMatch =
+    cleanText.match(/(?:TONS?|NET TONS?|QTY|QUANTITY)[ #:.\-]*([0-9]+(?:\.[0-9]+)?)/i) ||
+    cleanText.match(/([0-9]+(?:\.[0-9]+)?) *(?:TONS?|TN)/i);
 
-    const tonsMatch =
-      cleanText.match(/(?:TONS?|NET TONS?|QTY|QUANTITY)[ #:.\-]*([0-9]+(?:\.[0-9]+)?)/i) ||
-      cleanText.match(/([0-9]+(?:\.[0-9]+)?) *(?:TONS?|TN)/i);
+  const sourceMatch = cleanText.match(
+    /(?:SOURCE|PLANT|FROM|PIT|QUARRY)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i
+  );
 
-    const sourceMatch = cleanText.match(/(?:SOURCE|PLANT|FROM|PIT|QUARRY)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i);
-    const shipToMatch = cleanText.match(/(?:SHIP TO|DESTINATION|JOB)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i);
+  const shipToMatch = cleanText.match(
+    /(?:SHIP TO|DESTINATION|JOB)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i
+  );
 
-    return {
-      load_number: bolMatch?.[1]?.trim() || "",
-      tons: tonsMatch?.[1]?.trim() || "",
-      source_sp: sourceMatch?.[1]?.trim() || "",
-      ship_to: shipToMatch?.[1]?.trim() || ""
-    };
-  }
+  return {
+    load_number: bolMatch?.[1]?.trim() || "",
+    tons: tonsMatch?.[1]?.trim() || "",
+    source_sp: sourceMatch?.[1]?.trim() || "",
+    ship_to: shipToMatch?.[1]?.trim() || ""
+  };
+}
 
   function applyTicketGuesses(text) {
     const guesses = guessTicketFields(text);
@@ -1044,48 +1047,92 @@ function App() {
     );
   }
 
-  function CustomersPage() {
-    return (
-      <>
-        <PageHeader title="Customers" subtitle="Add the companies you haul for. Default rate and FSC will auto-fill on load entry." />
-        <form onSubmit={saveCustomer} className="card form">
-          <h2>{editingCustomerId ? "Edit Customer" : "Add Customer"}</h2>
-          <input placeholder="Customer Name" value={customerForm.name} onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })} required />
-          <input placeholder="Billing Address" value={customerForm.billing_address} onChange={e => setCustomerForm({ ...customerForm, billing_address: e.target.value })} />
-          <input type="number" step="0.01" placeholder="Default Customer Rate Per Ton" value={customerForm.default_rate} onChange={e => setCustomerForm({ ...customerForm, default_rate: e.target.value })} />
-          <input type="number" step="0.01" placeholder="Default FSC %" value={customerForm.default_fsc_percent} onChange={e => setCustomerForm({ ...customerForm, default_fsc_percent: e.target.value })} />
-          <button type="submit">{editingCustomerId ? "Update Customer" : "Save Customer"}</button>
-          {editingCustomerId && (
-            <button type="button" className="secondary" onClick={cancelEditCustomer}>
-              Cancel Edit
-            </button>
-          )
-        </form>
+ function CustomersPage() {
+  return (
+    <>
+      <PageHeader title="Customers" subtitle="Add or edit companies you haul for. Default rate and FSC will auto-fill on load entry." />
 
-        <div className="card">
-          <h2>Customer List</h2>
-          <table>
-            <thead><tr><th>Name</th><th>Billing Address</th><th>Default Rate/Ton</th><th>Default FSC %</th><th>Actions</th></tr></thead>
-            <tbody>
-              {customers.map(customer => (
-                <tr key={customer.id}>
-                  <td>{customer.name}</td>
-                  <td>{customer.billing_address}</td>
-                  <td>{money(customer.default_rate)}</td>
-                  <td>{Number(customer.default_fsc_percent || 0).toFixed(2)}%</td>
-                  <td>
-                    <button type="button" className="small-button" onClick={() => startEditCustomer(customer)}>
-                      Edit
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </>
-    );
-  }
+      <form onSubmit={saveCustomer} className="card form">
+        <h2>{editingCustomerId ? "Edit Customer" : "Add Customer"}</h2>
+
+        <input
+          placeholder="Customer Name"
+          value={customerForm.name}
+          onChange={e => setCustomerForm({ ...customerForm, name: e.target.value })}
+          required
+        />
+
+        <input
+          placeholder="Billing Address"
+          value={customerForm.billing_address}
+          onChange={e => setCustomerForm({ ...customerForm, billing_address: e.target.value })}
+        />
+
+        <input
+          type="number"
+          step="0.01"
+          placeholder="Default Customer Rate Per Ton"
+          value={customerForm.default_rate}
+          onChange={e => setCustomerForm({ ...customerForm, default_rate: e.target.value })}
+        />
+
+        <input
+          type="number"
+          step="0.01"
+          placeholder="Default FSC %"
+          value={customerForm.default_fsc_percent}
+          onChange={e => setCustomerForm({ ...customerForm, default_fsc_percent: e.target.value })}
+        />
+
+        <button type="submit">
+          {editingCustomerId ? "Update Customer" : "Save Customer"}
+        </button>
+
+        {editingCustomerId && (
+          <button type="button" className="secondary" onClick={cancelEditCustomer}>
+            Cancel Edit
+          </button>
+        )}
+      </form>
+
+      <div className="card">
+        <h2>Customer List</h2>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Billing Address</th>
+              <th>Default Rate/Ton</th>
+              <th>Default FSC %</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {customers.map(customer => (
+              <tr key={customer.id}>
+                <td>{customer.name}</td>
+                <td>{customer.billing_address}</td>
+                <td>{money(customer.default_rate)}</td>
+                <td>{Number(customer.default_fsc_percent || 0).toFixed(2)}%</td>
+                <td>
+                  <button
+                    type="button"
+                    className="small-button"
+                    onClick={() => startEditCustomer(customer)}
+                  >
+                    Edit
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}
 
   function DriversPage() {
     return (
@@ -1470,24 +1517,27 @@ function App() {
       <div className="screen-area">
         <div className="topbar">
           <div className="topbar-header">
-          <div className="brand">E&J Trucking</div>
-          <div className="user-bar">
-            <span className="user-name">
-              {currentProfile?.full_name || session?.user?.email}
-            </span>
+            <div className="brand">E&J Trucking</div>
 
-            <span className="role-badge">
-              {currentProfile?.role || "dispatcher"}
-            </span>
+            <div className="user-bar">
+              <span className="user-name">
+                {currentProfile?.full_name || session?.user?.email}
+              </span>
 
-            <button
-              type="button"
-              className="small-button"
-              onClick={signOut}
-            >
-              Sign Out
-            </button>
+              <span className="role-badge">
+                {currentProfile?.role || "dispatcher"}
+              </span>
+
+              <button
+                type="button"
+                className="small-button"
+                onClick={signOut}
+              >
+                Sign Out
+              </button>
+            </div>
           </div>
+
           <div className="nav-row">
             <NavButton id="home" label="Home" />
             <NavButton id="loads" label="Loads" />
@@ -1496,11 +1546,12 @@ function App() {
             <NavButton id="trucks" label="Trucks" />
             <NavButton id="invoices" label="Invoices" />
             <NavButton id="invoicehistory" label="Invoice History" />
-            {(currentProfile?.role || "dispatcher") === "admin" && <NavButton id="users" label="Users" />}
+            {(currentProfile?.role || "dispatcher") === "admin" && (
+              <NavButton id="users" label="Users" />
+            )}
             <NavButton id="driverpay" label="Driver Pay" />
           </div>
         </div>
-          </div>
 
         {message && <div className="message">{message}</div>}
 
