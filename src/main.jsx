@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { createClient } from "@supabase/supabase-js";
 import "./style.css";
+import { createWorker } from "tesseract.js";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -68,6 +69,9 @@ function App() {
   const [message, setMessage] = useState("");
   const [editingLoadId, setEditingLoadId] = useState(null);
   const [ticketFile, setTicketFile] = useState(null);
+  const [ticketPreviewUrl, setTicketPreviewUrl] = useState("");
+  const [ocrText, setOcrText] = useState("");
+  const [ocrReading, setOcrReading] = useState(false);
 
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10));
@@ -295,6 +299,82 @@ function App() {
         </form>
       </div>
     );
+  }
+
+  function guessTicketFields(text) {
+    const cleanText = text.replace(/[ 
+
+	]+/g, " ").trim();
+
+    const bolMatch =
+      cleanText.match(/(?:BOL|LOAD|TICKET|TKT|SLIP)[ #:.\-]*([A-Z0-9\-]{4,})/i) ||
+      cleanText.match(/([A-Z]{1,4}\-?[0-9]{4,})/i);
+
+    const tonsMatch =
+      cleanText.match(/(?:TONS?|NET TONS?|QTY|QUANTITY)[ #:.\-]*([0-9]+(?:\.[0-9]+)?)/i) ||
+      cleanText.match(/([0-9]+(?:\.[0-9]+)?) *(?:TONS?|TN)/i);
+
+    const sourceMatch = cleanText.match(/(?:SOURCE|PLANT|FROM|PIT|QUARRY)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i);
+    const shipToMatch = cleanText.match(/(?:SHIP TO|DESTINATION|JOB)[ #:.\-]*([A-Z0-9 &'\/\-]{3,40})/i);
+
+    return {
+      load_number: bolMatch?.[1]?.trim() || "",
+      tons: tonsMatch?.[1]?.trim() || "",
+      source_sp: sourceMatch?.[1]?.trim() || "",
+      ship_to: shipToMatch?.[1]?.trim() || ""
+    };
+  }
+
+  function applyTicketGuesses(text) {
+    const guesses = guessTicketFields(text);
+
+    setLoadForm(current => ({
+      ...current,
+      load_number: guesses.load_number || current.load_number,
+      tons: guesses.tons || current.tons,
+      source_sp: guesses.source_sp || current.source_sp,
+      ship_to: guesses.ship_to || current.ship_to
+    }));
+  }
+
+  async function readTicketPhoto() {
+    if (!ticketFile) {
+      setMessage("Upload a ticket photo first.");
+      return;
+    }
+
+    setOcrReading(true);
+    setMessage("Reading ticket photo...");
+
+    try {
+      const worker = await createWorker("eng");
+      const result = await worker.recognize(ticketFile);
+      await worker.terminate();
+
+      const text = result.data.text || "";
+      setOcrText(text);
+      applyTicketGuesses(text);
+      setMessage("Ticket photo read. Check the auto-filled fields before saving.");
+    } catch (error) {
+      setMessage(`Could not read ticket photo: ${error.message}`);
+    } finally {
+      setOcrReading(false);
+    }
+  }
+
+  function handleTicketFileChange(file) {
+    setTicketFile(file || null);
+    setOcrText("");
+
+    if (ticketPreviewUrl) {
+      URL.revokeObjectURL(ticketPreviewUrl);
+    }
+
+    if (file) {
+      setTicketPreviewUrl(URL.createObjectURL(file));
+    } else {
+      setTicketPreviewUrl("");
+    }
   }
 
   function updateLoadField(field, value) {
@@ -859,8 +939,24 @@ function App() {
 
           <label className="file-input">
             Ticket / BOL Photo
-            <input type="file" accept="image/*" onChange={e => setTicketFile(e.target.files?.[0] || null)} />
+            <input type="file" accept="image/*" onChange={e => handleTicketFileChange(e.target.files?.[0] || null)} />
           </label>
+
+          {ticketPreviewUrl && (
+            <div className="ticket-preview-box">
+              <img src={ticketPreviewUrl} alt="Ticket preview" className="ticket-preview" />
+              <button type="button" className="secondary" onClick={readTicketPhoto} disabled={ocrReading}>
+                {ocrReading ? "Reading Ticket..." : "Read Ticket Photo"}
+              </button>
+            </div>
+          )}
+
+          {ocrText && (
+            <details className="ocr-details">
+              <summary>View OCR Text</summary>
+              <pre>{ocrText}</pre>
+            </details>
+          )}
 
           {loadForm.ticket_photo_url && (
             <a href={loadForm.ticket_photo_url} target="_blank" rel="noreferrer" className="photo-link">

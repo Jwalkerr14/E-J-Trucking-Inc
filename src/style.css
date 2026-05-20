@@ -305,4 +305,27 @@ tr:hover td {
 .dashboard-button {
   text-align: left;
   width: 100%;
+}.ticket-preview-box {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 12px;
+}
+
+.ticket-preview {
+  max-width: 320px;
+  border-radius: 14px;
+  border: 1px solid #374151;
+}
+
+.ocr-details {
+  grid-column: 1 / -1;
+  background: #0f172a;
+  border: 1px solid #374151;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.ocr-details pre {
+  white-space: pre-wrap;
+  color: #d1d5db;
 }
